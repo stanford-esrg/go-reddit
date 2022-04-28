@@ -113,3 +113,88 @@ func (s set) Exists(v string) bool {
 	_, ok := s[v]
 	return ok
 }
+
+// streaming comments
+
+func (s *StreamService) getComments(postId string) (*PostAndComments, error) {
+	posts, _, err := s.client.Post.Get(context.Background(), postId)
+
+	// TODO: include the more call to get more comments?
+
+	return posts, err
+}
+
+// TODO: unify code between this and the Posts stream above
+func (s *StreamService) Comments(postId string, opts ...StreamOpt) (<-chan *Comment, <-chan error, func()) {
+	streamConfig := &streamConfig{
+		Interval:       defaultStreamInterval,
+		DiscardInitial: false,
+		MaxRequests:    0,
+	}
+	for _, opt := range opts {
+		opt(streamConfig)
+	}
+
+	ticker := time.NewTicker(streamConfig.Interval)
+	commentsCh := make(chan *Comment)
+	errsCh := make(chan error)
+
+	var once sync.Once
+	stop := func() {
+		once.Do(func() {
+			ticker.Stop()
+			close(commentsCh)
+			close(errsCh)
+		})
+	}
+
+	// originally used the "before" parameter, but if that post gets deleted, subsequent requests
+	// would just return empty listings; easier to just keep track of all post ids encountered
+	ids := set{}
+
+	go func() {
+		defer stop()
+
+		var n int
+		infinite := streamConfig.MaxRequests == 0
+
+		for ; ; <-ticker.C {
+			n++
+
+			postAndComments, err := s.getComments(postId)
+			comments := postAndComments.Comments
+
+			if err != nil {
+				errsCh <- err
+				if !infinite && n >= streamConfig.MaxRequests {
+					break
+				}
+				continue
+			}
+
+			for _, comment := range comments {
+				id := comment.FullID
+
+				// if this post id is already part of the set, it means that it and the ones
+				// after it in the list have already been streamed, so break out of the loop
+				if ids.Exists(id) {
+					break
+				}
+				ids.Add(id)
+
+				if streamConfig.DiscardInitial {
+					streamConfig.DiscardInitial = false
+					break
+				}
+
+				commentsCh <- comment
+			}
+
+			if !infinite && n >= streamConfig.MaxRequests {
+				break
+			}
+		}
+	}()
+
+	return commentsCh, errsCh, stop
+}

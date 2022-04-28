@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stanford-esrg/go-reddit"
+	"github.com/vartanbeno/go-reddit/v2/reddit"
 )
 
 var ctx = context.Background()
@@ -18,7 +19,11 @@ func main() {
 	defer close(sig)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
-	posts, errs, stop := reddit.DefaultClient().Stream.Posts("AskReddit", reddit.StreamInterval(time.Second*3), reddit.StreamDiscardInitial)
+	// get a post
+	// TODO: add error checking
+	postId, _, _ := reddit.DefaultClient().Subreddit.getPosts(context.Background(), "AskReddit", &reddit.ListOptions{Limit: 1})
+
+	comments, errs, stop := reddit.DefaultClient().Stream(postId, reddit.StreamInterval(time.Second*3), reddit.StreamDiscardInitial)
 	defer stop()
 
 	timer := time.NewTimer(time.Minute)
@@ -26,11 +31,11 @@ func main() {
 
 	for {
 		select {
-		case post, ok := <-posts:
+		case comment, ok := <-comments:
 			if !ok {
 				return
 			}
-			fmt.Printf("Received post: %s\n", post.Title)
+			fmt.Printf("Received comment: %s\n", comment.Body)
 		case err, ok := <-errs:
 			if !ok {
 				return
