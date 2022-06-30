@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-
-	"github.com/stanford-esrg/go-reddit"
 )
 
 var ctx = context.Background()
@@ -17,7 +15,9 @@ func main() {
 }
 
 func run() (err error) {
-	sr, _, err := reddit.DefaultClient().Subreddit.Get(ctx, "golang")
+	// sr, _, err := reddit.DefaultClient().Subreddit.Get(ctx, "golang")
+	c, err := NewClient(Credentials{}, WithUserAgent("test"))
+	c, err := NewClient
 	if err != nil {
 		return
 	}
