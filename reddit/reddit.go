@@ -21,7 +21,7 @@ import (
 
 const (
 	libraryName    = "github.com/stanford-esrg/go-reddit"
-	libraryVersion = "2.0.0"
+	libraryVersion = "3.0.0"
 
 	defaultBaseURL         = "https://oauth.reddit.com"
 	defaultBaseURLReadonly = "https://reddit.com"
